@@ -31,3 +31,9 @@
 - 发现可以用go，发现再次遇到了建立不了工作区的问题，试图解决，好像发现了原因，但还没
 - 写记录的时候遇到Error loading webview: Error: Could not register service worker问题  
     >有用的参考：<https://stackoverflow.com/questions/67698176/error-loading-webview-error-could-not-register-service-workers-typeerror-fai>
+
+10.3
+
+- 一次完整的http请求过程 <https://cloud.tencent.com/developer/article/1500463>
+- 实现简单的服务器和客户端，完成相互测试
+- 实现通过命令行控制，未成功，调试中
