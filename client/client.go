@@ -4,8 +4,13 @@ package client
 // package main
 
 import (
-	//"fmt"
+	"fmt"
+	"io"
+	// "flag"
+	// "strconv"
+	"strings"
 	"net"
+	"net/http"
 )
 
 // func main() {
@@ -79,4 +84,29 @@ func SendUDPRequest(serverAddr string, data string) (string, error) {
 	}
 
 	return string(buffer[:n]), nil
+}
+// 发送 GET 请求
+func SendGETRest()(error){
+	getResponse, err := http.Get("http://localhost:8080")
+	if err != nil {
+		fmt.Println("GET 请求出错:", err)
+		return err
+	}
+	defer getResponse.Body.Close()
+	body, _ := io.ReadAll(getResponse.Body)
+	fmt.Println("GET 响应:", string(body))
+	return nil
+}
+
+// 发送 POST 请求
+func SendPOSTRequest(postData string)(error){
+	postResponse, err := http.Post("http://localhost:8080", "text/plain", strings.NewReader(postData))
+	if err != nil {
+		fmt.Println("POST 请求出错:", err)
+		return err
+	}
+	defer postResponse.Body.Close()
+	body, _ := io.ReadAll(postResponse.Body)
+	fmt.Println("POST 响应:", string(body))
+	return nil
 }
