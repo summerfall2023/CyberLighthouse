@@ -11,12 +11,12 @@ type packet struct {
 
 // header-----------------------------------------------------
 type packetHeader struct {
-	ID    uint16 // 2 bytes
-	Flags uint16 // 2 bytes
-	QC    uint16 // query count 2 bytes
-	AC    uint16 // answer count 2 bytes
-	NSC   uint16 // name server count 2 bytes
-	AR    uint16 // additional record count 2 bytes
+	ID    uint16           // 2 bytes
+	Flags packetHeaderFlag // 2 bytes
+	QC    uint16           // query count 2 bytes
+	AC    uint16           // answer count 2 bytes
+	NSC   uint16           // name server count 2 bytes
+	AR    uint16           // additional record count 2 bytes
 }
 type packetHeaderFlag struct {
 	QR     bool       // 1 bit,query = 0,reaponse = 1
