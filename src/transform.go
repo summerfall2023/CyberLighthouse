@@ -64,3 +64,22 @@ func Byte4ToUint32(a []byte) (uint32, error) {
 	err4 := fmt.Errorf("Byte4ToUint32 error:The length expected less than 4")
 	return 0, err4
 }
+
+//function for generator
+
+func Uint16ToByte2(a uint16) (byte, byte) {
+	// var res []byte
+	// res = append(res, byte(a>>BYTE_TO_UINT16_OFFSET))
+	// res = append(res, byte(a&0b11111111))
+	return byte(a >> BYTE_TO_UINT16_OFFSET), byte(a & 0b11111111)
+}
+
+func Uint32ToByte4(a uint32) []byte {
+	bytes := make([]byte, 4)
+	// 掩码
+	bytes[0] = byte((a >> 24) & 0xFF)
+	bytes[1] = byte((a >> 16) & 0xFF)
+	bytes[2] = byte((a >> 8) & 0xFF)
+	bytes[3] = byte(a & 0xFF)
+	return bytes
+}

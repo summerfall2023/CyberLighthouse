@@ -60,11 +60,12 @@ const (
 // query----------------------------------------------------
 type packetQuery struct {
 	QName  string         // 可变长，以00结尾
-	QType  QueryType      // 4 bytes 2 uint16 （一个16进制数，两个16进制位，0-255）
-	QClass QueryClassType // 4 bytes 2 uint16
+	QType  QueryType      // 2 bytes 4 uint16 （一个16进制数，四个16进制位）
+	QClass QueryClassType // 2 bytes 4 uint16
 }
 
-type QueryType uint16 // (0-255)
+type QueryType uint16
+
 const (
 	A                  QueryType = 1
 	NS                 QueryType = 2
@@ -97,7 +98,6 @@ type packetRecordData struct {
 	CNAME_Name string
 	MX         MXRecordData
 	AAAA_IP    [16]byte
-	originData []byte // todo
 }
 
 type MXRecordData struct { // todo
