@@ -200,7 +200,7 @@ func (p *ParsePacket) parseResourceRecord(offset int) (packetResource, int, erro
 	if currentIndex+int(rr.ReLength) > len(p.binaryPacket) {
 		return rr, currentIndex, fmt.Errorf("Resource record parsing error: unexpected end of data")
 	}
-	RData, err5 := p.ParseRecourdData(p.binaryPacket[currentIndex : currentIndex+int(rr.ReLength)])
+	RData, err5 := p.ParseRecourdData(rr, currentIndex)
 	currentIndex += int(rr.ReLength)
 	if err5 != nil {
 		return packetResource{}, -1, err5
@@ -209,9 +209,62 @@ func (p *ParsePacket) parseResourceRecord(offset int) (packetResource, int, erro
 	return rr, currentIndex, nil
 }
 
-func (p *ParsePacket) ParseRecourdData(data []byte) (packetRecordData, error) {
+func (p *ParsePacket) ParseRecourdData(r packetResource, RDstartIndex int) (packetRecordData, error) {
 	//switch
 	var RecordData packetRecordData
-	RecordData.A_IP = [4]byte(data)
+	switch r.Type {
+	case A:
+		RecordData.A_IP = [4]byte{
+			p.binaryPacket[RDstartIndex],
+			p.binaryPacket[RDstartIndex+1],
+			p.binaryPacket[RDstartIndex+2],
+			p.binaryPacket[RDstartIndex+3],
+		}
+	case NS:
+		var err error
+		RecordData.NS_Name, _, err = p.ParseDomainName(RDstartIndex)
+		if err != nil {
+			return packetRecordData{}, err
+		}
+	case CNAME:
+		var err error
+		RecordData.NS_Name, _, err = p.ParseDomainName(RDstartIndex)
+		if err != nil {
+			return packetRecordData{}, err
+		}
+	case AAAA:
+		// 解析AAAA记录的RData（IPv6地址）
+		RecordData.AAAA_IP = [16]byte{
+			p.binaryPacket[RDstartIndex],
+			p.binaryPacket[RDstartIndex+1],
+			p.binaryPacket[RDstartIndex+2],
+			p.binaryPacket[RDstartIndex+3],
+			p.binaryPacket[RDstartIndex+4],
+			p.binaryPacket[RDstartIndex+5],
+			p.binaryPacket[RDstartIndex+6],
+			p.binaryPacket[RDstartIndex+7],
+			p.binaryPacket[RDstartIndex+8],
+			p.binaryPacket[RDstartIndex+9],
+			p.binaryPacket[RDstartIndex+10],
+			p.binaryPacket[RDstartIndex+11],
+			p.binaryPacket[RDstartIndex+12],
+			p.binaryPacket[RDstartIndex+13],
+			p.binaryPacket[RDstartIndex+14],
+			p.binaryPacket[RDstartIndex+15],
+		}
+	case MX:
+
+		preference := uint16(p.binaryPacket[RDstartIndex])<<8 | uint16(p.binaryPacket[RDstartIndex+1])
+		RecordData.MX.MX_Preference = preference
+
+		// MX记录中的RData包括一个域名
+		name, _, err := p.ParseDomainName(RDstartIndex + 2) // 加2是因为优先级字段占用了2个字节
+		if err != nil {
+			return RecordData, err
+		}
+		RecordData.MX.MX_Name = name
+	default:
+		return RecordData, fmt.Errorf("Unsupported record type: %d", r.Type)
+	}
 	return RecordData, nil
 }

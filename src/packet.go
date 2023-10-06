@@ -96,11 +96,11 @@ type packetRecordData struct {
 	NS_Name    string
 	CNAME_Name string
 	MX         MXRecordData
-	AAAA_IP    [8]uint16
+	AAAA_IP    [16]byte
 	originData []byte // todo
 }
 
 type MXRecordData struct { // todo
-	Preference uint16
-	Name       string
+	MX_Preference uint16
+	MX_Name       string
 }
