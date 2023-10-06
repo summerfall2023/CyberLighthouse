@@ -20,7 +20,7 @@ func Byte2ToUint16(a []byte) (uint16, error) {
 	if len(a) == 2 {
 		return (uint16(a[0]) << BYTE_TO_UINT16_OFFSET) + uint16(a[1]), nil
 	}
-	err := fmt.Errorf("The lenth of assingment should be less than 2")
+	err := fmt.Errorf("Byte2ToUint16 error:The lenth of assingment should be less than 2")
 	return 0, err
 }
 

@@ -2,19 +2,21 @@ package server
 
 import (
 	//"fmt"
-	"github.com/gin-gonic/gin"
+	"net/http"
 	"sync"
 	"time"
-	"net/http"
+
+	"github.com/gin-gonic/gin"
 )
 
 var (
-	requestCount      int
-	lastRequestTime   time.Time
+	requestCount         int
+	lastRequestTime      time.Time
 	maxRequestsPerSecond = 5 // 允许的最大请求数
-	lock              sync.Mutex
+	lock                 sync.Mutex
 )
 
+// todo:change 监听对象
 func CheckFrequency() {
 	r := gin.Default()
 	r.Use(RateLimitMiddleware)
