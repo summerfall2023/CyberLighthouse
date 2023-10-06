@@ -10,28 +10,36 @@ type ParsePacket struct {
 	parsedPacket packet
 }
 
-func (p *ParsePacket) ParsePacket() (packet, error) {
+func (p *ParsePacket) ParsePacket() (ParsePacket, error) {
 	var res packet
 	var err1 error
 	// header
 	res.header, err1 = p.ParseHeader(p.binaryPacket[0:12])
 	if err1 != nil {
-		return packet{}, err1
+		return ParsePacket{}, err1
 	}
 	// queries
 	// 通常QC是1，如果QC不是1如何处理？？？？？？？？？？？？？？？
 	// for i := 1; i < int(res.header.QC); i++ {
 	// 	ParseQuery()
 	// }
-	var start int
-	start = 12
-	query, err2 := p.ParseQuery(start)
+	start := 12
+	var currentIndex int
+	query, currentIndex, err2 := p.ParseQuery(start)
 	if err2 != nil {
-		return packet{}, err2
+		return ParsePacket{}, err2
 	}
 	res.queries = append(res.queries, query)
 	// record
-	return res, nil
+	res.answers, currentIndex = p.ParseResourceRecords(int(res.header.AC), currentIndex)
+	res.authority, currentIndex = p.ParseResourceRecords(int(res.header.NSC), currentIndex)
+	res.additional, currentIndex = p.ParseResourceRecords(int(res.header.AR), currentIndex)
+	if currentIndex != len(p.binaryPacket)-1 {
+		err3 := fmt.Errorf(ERROR_RECORD_LENGTH)
+		return ParsePacket{}, err3
+	}
+	p.parsedPacket = res
+	return *p, nil
 }
 
 // header 12 bytes-----------------------------------------
@@ -48,7 +56,7 @@ func (p *ParsePacket) ParseHeader(data []byte) (packetHeader, error) {
 	header.NSC, err5 = Byte2ToUint16(data[8:10])
 	header.AR, err6 = Byte2ToUint16(data[10:12])
 	if err1 != nil || err2 != nil || err3 != nil || err4 != nil || err5 != nil || err6 != nil {
-		err := fmt.Errorf("Error: At least one error occurred when parse header.")
+		err := fmt.Errorf("error: At least one error occurred when parse header")
 		return packetHeader{}, err
 	} else {
 		fmt.Println(header)
@@ -79,25 +87,25 @@ func (p *ParsePacket) ParseHeaderFlags(data []byte) (packetHeaderFlag, error) {
 }
 
 // queries----------------------------------------------
-func (p *ParsePacket) ParseQuery(start int) (packetQuery, error) {
+func (p *ParsePacket) ParseQuery(start int) (packetQuery, int, error) {
 	var query packetQuery
 	var err1 error
 	var currentIndex int
 	query.QName, currentIndex, err1 = p.ParseDomainName(start)
 	if err1 != nil {
-		return packetQuery{}, err1
+		return packetQuery{}, -1, err1
 	}
 	qTypeUint16, err1 := Byte2ToUint16(p.binaryPacket[currentIndex : currentIndex+2])
 	if err1 != nil {
-		return packetQuery{}, err1
+		return packetQuery{}, -1, err1
 	}
 	query.QType = QueryType(qTypeUint16)
 	qClassUint16, err2 := Byte2ToUint16(p.binaryPacket[currentIndex+2 : currentIndex+4])
 	if err2 != nil {
-		return packetQuery{}, err2
+		return packetQuery{}, -1, err2
 	}
 	query.QClass = QueryClassType(qClassUint16)
-	return query, nil
+	return query, currentIndex, nil
 }
 
 func (p *ParsePacket) ParseDomainName(offset int) (string, int, error) {
@@ -154,8 +162,21 @@ NS记录（域名服务器记录）：RData 包含域名服务器的域名，通
 
 SRV记录（服务记录）：RData 包含服务的相关信息，通常表示为一个结构体或自定义类型。
 */
-func ParseResource()
-func (p *ParsePacket) parseResourceRecord(offset int) (packetResource, int, error) {
+func (p *ParsePacket) ParseResourceRecords(count int, currentIndex int) ([]packetResource, int) {
+	i := 0
+	var res []packetResource
+	for i < count {
+		var err error
+		var packetResource packetResource
+		packetResource, currentIndex, err = p.ParseResourceRecord(currentIndex)
+		if err != nil {
+			return nil, -1
+		}
+		res = append(res, packetResource)
+	}
+	return res, currentIndex
+}
+func (p *ParsePacket) ParseResourceRecord(offset int) (packetResource, int, error) {
 	var rr packetResource
 	currentIndex := offset
 
@@ -169,7 +190,8 @@ func (p *ParsePacket) parseResourceRecord(offset int) (packetResource, int, erro
 
 	// 解析资源记录的类型、类、TTL和数据长度字段
 	if currentIndex+10 > len(p.binaryPacket) {
-		return rr, currentIndex, fmt.Errorf("Resource record parsing error: unexpected end of data")
+		err1 := fmt.Errorf("resource record parsing error: unexpected end of data")
+		return rr, currentIndex, err1
 	}
 
 	Type, err1 := Byte2ToUint16(p.binaryPacket[currentIndex : currentIndex+2])
@@ -198,7 +220,7 @@ func (p *ParsePacket) parseResourceRecord(offset int) (packetResource, int, erro
 
 	// 解析资源记录的数据字段
 	if currentIndex+int(rr.ReLength) > len(p.binaryPacket) {
-		return rr, currentIndex, fmt.Errorf("Resource record parsing error: unexpected end of data")
+		return rr, currentIndex, fmt.Errorf("resource record parsing error: unexpected end of data")
 	}
 	RData, err5 := p.ParseRecourdData(rr, currentIndex)
 	currentIndex += int(rr.ReLength)
@@ -264,7 +286,7 @@ func (p *ParsePacket) ParseRecourdData(r packetResource, RDstartIndex int) (pack
 		}
 		RecordData.MX.MX_Name = name
 	default:
-		return RecordData, fmt.Errorf("Unsupported record type: %d", r.Type)
+		return RecordData, fmt.Errorf("parseRecordData unsupported record type: %d", r.Type)
 	}
 	return RecordData, nil
 }

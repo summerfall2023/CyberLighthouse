@@ -10,8 +10,7 @@ type GeneratePacket struct {
 func (p *GeneratePacket) GeneratePacket() GeneratePacket {
 	var res []byte
 	//var err1 error
-	var header []byte
-	header = p.GenerateHeader()
+	header := p.GenerateHeader()
 	res = append(res, header...)
 	query := p.GenerateQuery()
 	res = append(res, query...)
