@@ -7,12 +7,12 @@ import (
 // 把二进制报文转换成packet
 type ParsePacket struct {
 	BinaryPacket []byte
-	ParsedPacket packet
+	ParsedPacket Packet
 }
 
 func (p *ParsePacket) ParsePacket() (ParsePacket, error) {
 	fmt.Println("START================================================")
-	var res packet
+	var res Packet
 	var err1 error
 	// header
 	res.header, err1 = p.ParseHeader(p.BinaryPacket[0:12])
@@ -182,7 +182,7 @@ func (p *ParsePacket) ParseResourceRecord(offset int) (packetResource, int, erro
 	// 解析资源记录的类型、类、TTL和数据长度字段
 	if currentIndex+10 > len(p.BinaryPacket) {
 		err0 := fmt.Errorf("this is a resource record parsing error: unexpected end of data")
-		fmt.Println("PARSE_RECORD: error ", err0, "\n		lenth of binary packet: ", len(p.BinaryPacket))
+		fmt.Println("PARSE_RECORD: error ", err0, "\n		lenth of binary Packet: ", len(p.BinaryPacket))
 		return rr, currentIndex, err0
 	}
 	fmt.Println("TTTTTTTTTTTTTTTT:cur = ", currentIndex)

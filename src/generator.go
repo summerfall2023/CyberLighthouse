@@ -3,7 +3,7 @@ package src
 import "strings"
 
 type GeneratePacket struct {
-	OriginData packet
+	OriginData Packet
 	BinaryData []byte
 }
 

@@ -6,7 +6,7 @@ import (
 )
 
 // byte 8 bits, uint16 1位 4 bits
-type packet struct {
+type Packet struct {
 	header     packetHeader // 12 bytes
 	queries    []packetQuery
 	answers    []packetResource
@@ -108,7 +108,7 @@ type MXRecordData struct { // todo
 const f string = "(PRINTF)"
 
 // 整合输出
-func (p *packet) OutputPacket() (string, error) {
+func (p *Packet) OutputPacket() (string, error) {
 	res := ""
 	res = fmt.Sprintf("Domain Name System (%s)\n", p.OutputQR())
 	fmt.Println(f, res)
@@ -170,7 +170,7 @@ func (p *packet) OutputPacket() (string, error) {
 	return res, nil
 }
 
-func (p *packet) OutputQR() string {
+func (p *Packet) OutputQR() string {
 	var res string
 	switch p.header.Flags.QR {
 	case false:
@@ -182,7 +182,7 @@ func (p *packet) OutputQR() string {
 	}
 	return res
 }
-func (p *packet) OutputHeader() (string, error) {
+func (p *Packet) OutputHeader() (string, error) {
 	res := ""
 	res += fmt.Sprintf("	Transaction ID: %d\n", p.header.ID)
 	res += ("	Flags: ")
@@ -289,7 +289,7 @@ func (p *packet) OutputHeader() (string, error) {
 	return res, nil
 }
 
-func (p *packet) OutputQuery() (string, error) {
+func (p *Packet) OutputQuery() (string, error) {
 	res := ("	Query:\n")
 	qtype, err1 := p.OutputType(p.queries[0].QType)
 	if err1 != nil {
@@ -302,7 +302,7 @@ func (p *packet) OutputQuery() (string, error) {
 	res += fmt.Sprintf("		%s: type %s class %s\n", p.queries[0].QName, qtype, class)
 	return res, nil
 }
-func (p *packet) OutputType(t QueryType) (string, error) {
+func (p *Packet) OutputType(t QueryType) (string, error) {
 	var qtype string
 	switch t {
 	case A:
@@ -323,7 +323,7 @@ func (p *packet) OutputType(t QueryType) (string, error) {
 	return qtype, nil
 
 }
-func (p *packet) OutputClass(c QueryClassType) (string, error) {
+func (p *Packet) OutputClass(c QueryClassType) (string, error) {
 	var class string
 	switch c {
 	case IN:
@@ -334,7 +334,7 @@ func (p *packet) OutputClass(c QueryClassType) (string, error) {
 	}
 	return class, nil
 }
-func (p *packet) OutputResources(packetResource []packetResource, count int) (string, error) {
+func (p *Packet) OutputResources(packetResource []packetResource, count int) (string, error) {
 	fmt.Println("OUTPUT_RESOURCES START+++++++++++++++++++++++++++++")
 	i := 0
 	res := ""
@@ -351,7 +351,7 @@ func (p *packet) OutputResources(packetResource []packetResource, count int) (st
 	return res, nil
 }
 
-func (p *packet) OutputResource(packetResource packetResource) (string, error) {
+func (p *Packet) OutputResource(packetResource packetResource) (string, error) {
 	var res string
 	if packetResource.Name == " " {
 		res = "<root>"
@@ -373,7 +373,7 @@ func (p *packet) OutputResource(packetResource packetResource) (string, error) {
 	res += fmt.Sprintf("		Resource: %s\n", p.OutputRecordData(packetResource))
 	return res, nil
 }
-func (p *packet) OutputRecordData(packetResource packetResource) string {
+func (p *Packet) OutputRecordData(packetResource packetResource) string {
 	res := ""
 	switch packetResource.Type {
 	case NS:
