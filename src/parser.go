@@ -22,16 +22,16 @@ func (p *ParsePacket) ParsePacket() (ParsePacket, error) {
 	start := 12
 	var currentIndex int
 	query, currentIndex, err2 := p.ParseQuery(start)
-	fmt.Println("TTTTTTTTTT:cur = ", currentIndex)
+	//fmt.Println("TTTTTTTTTT:cur = ", currentIndex)
 	if err2 != nil {
 		return ParsePacket{}, err2
 	}
 	res.queries = append(res.queries, query)
 	// record
 	var err3 error
-	fmt.Println("PARSEPACKET: index1", currentIndex, " AC: ", int(res.header.AC))
+	//fmt.Println("PARSEPACKET: index1", currentIndex, " AC: ", int(res.header.AC))
 	res.answers, currentIndex, err3 = p.ParseResourceRecords(int(res.header.AC), currentIndex)
-	fmt.Println("PASREPACKET: index2", currentIndex)
+	//fmt.Println("PASREPACKET: index2", currentIndex)
 	if err3 != nil {
 		fmt.Println("PARSEPACKET: err3 ,", err3)
 		return ParsePacket{}, err3
@@ -185,7 +185,7 @@ func (p *ParsePacket) ParseResourceRecord(offset int) (packetResource, int, erro
 		fmt.Println("PARSE_RECORD: error ", err0, "\n		lenth of binary Packet: ", len(p.BinaryPacket))
 		return rr, currentIndex, err0
 	}
-	fmt.Println("TTTTTTTTTTTTTTTT:cur = ", currentIndex)
+	//fmt.Println("TTTTTTTTTTTTTTTT:cur = ", currentIndex)
 	Type, err1 := Byte2ToUint16(p.BinaryPacket[currentIndex : currentIndex+2])
 	if err1 != nil {
 		fmt.Println("PARSE_RECORD: err1 ", err1)
@@ -218,7 +218,7 @@ func (p *ParsePacket) ParseResourceRecord(offset int) (packetResource, int, erro
 	// 解析资源记录的数据字段
 	if currentIndex+int(rr.ReLength) > len(p.BinaryPacket) {
 		err6 := fmt.Errorf("resource record parsing error: unexpected end of data")
-		fmt.Println("PARSE_RECORD: ERROR ", err6, " CURRENTINDEX+INT(RR.RELENTH) = ", currentIndex+int(rr.ReLength), " CURRENTINDEX = ", currentIndex, " INT = ", int(rr.ReLength), " rr.RELENGT = ", rr.ReLength, " LEN(P.BINARYPACKET) = ", len(p.BinaryPacket))
+		//fmt.Println("PARSE_RECORD: ERROR ", err6, " CURRENTINDEX+INT(RR.RELENTH) = ", currentIndex+int(rr.ReLength), " CURRENTINDEX = ", currentIndex, " INT = ", int(rr.ReLength), " rr.RELENGT = ", rr.ReLength, " LEN(P.BINARYPACKET) = ", len(p.BinaryPacket))
 		return rr, currentIndex, err6
 	}
 	fmt.Println("RDATA: cur ", currentIndex)
