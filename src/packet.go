@@ -1,6 +1,9 @@
 package src
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // byte 8 bits, uint16 1位 4 bits
 type packet struct {
@@ -32,12 +35,6 @@ type packetHeaderFlag struct {
 	CD     bool       // A unacceptable
 	RCode  RCodeType  //4 bits
 }
-
-// type QRType bool
-// const (
-// 	QUERY QRType = true
-// 	answer QRType = false
-// )
 
 type OpCodeType uint16
 
@@ -100,6 +97,7 @@ type packetRecordData struct {
 	CNAME_Name string
 	MX         MXRecordData
 	AAAA_IP    [16]byte
+	Others     []byte
 }
 
 type MXRecordData struct { // todo
@@ -107,10 +105,13 @@ type MXRecordData struct { // todo
 	MX_Name       string
 }
 
-//整合输出
+const f string = "(PRINTF)"
+
+// 整合输出
 func (p *packet) OutputPacket() (string, error) {
 	res := ""
 	res = fmt.Sprintf("Domain Name System (%s)\n", p.OutputQR())
+	fmt.Println(f, res)
 	var err1, err2 error
 	var res0 string
 	res0, err1 = p.OutputHeader()
@@ -118,41 +119,54 @@ func (p *packet) OutputPacket() (string, error) {
 		return "", err1
 	}
 	res += res0
+	fmt.Println(f, res)
 	var res1 string
 	res1, err2 = p.OutputQuery()
 	if err2 != nil {
 		return "", err2
 	}
 	res += res1
-
+	fmt.Println(f, res)
 	// RECORD
 	// ANSWERS
-	if p.header.AC != 0 {
+	// p.header.AC != 0x0
+	if len(p.answers) != 0 {
 		res += ("	ANSWERS:\n")
 		r3, err3 := p.OutputResources(p.answers, int(p.header.AC))
 		if err3 != nil {
 			return "", err3
 		}
 		res += r3
+	} else {
+		res += "	No Answer\n"
 	}
+	fmt.Println(f, res)
 	// AUTHORITY
-	if p.header.NSC != 0 {
+	// p.header.NSC != 0x0
+	if len(p.authority) != 0 {
 		res += ("	AUTHORITY:\n")
 		r4, err4 := p.OutputResources(p.authority, int(p.header.NSC))
 		if err4 != nil {
 			return "", err4
 		}
 		res += r4
+	} else {
+		res += "	No Authority\n"
 	}
+	fmt.Println(f, res)
 	// ADDITIONAL
-	if p.header.AR != 0 {
+	// p.header.AR != 0x0
+	if len(p.additional) != 0 {
 		res += ("	ADDITIONAL:\n")
 		r5, err5 := p.OutputResources(p.additional, int(p.header.AR))
 		if err5 != nil {
 			return "", err5
 		}
 		res += r5
+	} else {
+		res += "	No Additional\n"
 	}
+	fmt.Println(f, res)
 	return res, nil
 }
 
@@ -174,9 +188,8 @@ func (p *packet) OutputHeader() (string, error) {
 	res += ("	Flags: ")
 	res += ("\n")
 	res += fmt.Sprintf("		Response: Message is a %s\n", p.OutputQR())
-	var opcode string
 
-	res += fmt.Sprintf("		Opcode: %s (%d)", opcode, p.header.Flags.OpCode)
+	var opcode string
 	switch p.header.Flags.OpCode {
 	case STANDARD_QUERY:
 		opcode = "standard query"
@@ -187,6 +200,7 @@ func (p *packet) OutputHeader() (string, error) {
 	default:
 		opcode = "reserved"
 	}
+	res += fmt.Sprintf("		Opcode: %s (%d)\n", opcode, p.header.Flags.OpCode)
 
 	switch p.header.Flags.AA {
 	case true:
@@ -210,7 +224,7 @@ func (p *packet) OutputHeader() (string, error) {
 	case true:
 		res += ("		Recursion desired: Do query recursively\n")
 	case false:
-		res += ("		Recursion desired: Do not query recursively\n")
+		res += ("		Recursion not desired: Do not query recursively\n")
 	default:
 		res += ""
 	}
@@ -226,7 +240,7 @@ func (p *packet) OutputHeader() (string, error) {
 
 	switch p.header.Flags.Z {
 	case false:
-		res += ("		Recursion available: Server can do recursive queries\n")
+		res += ("		Z:0\n")
 	default:
 		err := fmt.Errorf(ERROR_HEADER_FLAG_Z)
 		return "", err
@@ -283,9 +297,9 @@ func (p *packet) OutputQuery() (string, error) {
 	}
 	class, err2 := p.OutputClass(p.queries[0].QClass)
 	if err2 != nil {
-		return "", nil
+		return "", err2
 	}
-	res += fmt.Sprintf("		%s: type %s class: %s\n", p.queries[0].QName, qtype, class)
+	res += fmt.Sprintf("		%s: type %s class %s\n", p.queries[0].QName, qtype, class)
 	return res, nil
 }
 func (p *packet) OutputType(t QueryType) (string, error) {
@@ -304,8 +318,7 @@ func (p *packet) OutputType(t QueryType) (string, error) {
 	case AAAA:
 		qtype = "AAAA"
 	default:
-		err1 := fmt.Errorf(ERROR_QUERY_TYPE_UNSUPPORTED)
-		return "", err1
+		qtype = fmt.Sprintf("%v", t)
 	}
 	return qtype, nil
 
@@ -322,20 +335,29 @@ func (p *packet) OutputClass(c QueryClassType) (string, error) {
 	return class, nil
 }
 func (p *packet) OutputResources(packetResource []packetResource, count int) (string, error) {
+	fmt.Println("OUTPUT_RESOURCES START+++++++++++++++++++++++++++++")
 	i := 0
 	res := ""
 	for i < count {
+		fmt.Println("RESOURCE START++++++++++++++++++++++++++++")
 		r, err := p.OutputResource(packetResource[i])
 		if err != nil {
 			return "", err
 		}
 		res += r
+		fmt.Println(f, "RESOURCE", res)
+		i += 1
 	}
 	return res, nil
 }
 
 func (p *packet) OutputResource(packetResource packetResource) (string, error) {
-	res := fmt.Sprintf("		Name: %s \n", packetResource.Name)
+	var res string
+	if packetResource.Name == " " {
+		res = "<root>"
+	} else {
+		res = fmt.Sprintf("		Name: %s \n", packetResource.Name)
+	}
 	t, err1 := p.OutputType(packetResource.Type)
 	if err1 != nil {
 		return "", err1
@@ -347,7 +369,8 @@ func (p *packet) OutputResource(packetResource packetResource) (string, error) {
 	}
 	res += fmt.Sprintf("		Class: %s \n", c)
 	res += fmt.Sprintf("		Time to live: %d\n", packetResource.TTL)
-	res += fmt.Sprintf("		Data length: %s\n", p.OutputRecordData(packetResource))
+	res += fmt.Sprintf("		Data length: %d\n", packetResource.ReLength)
+	res += fmt.Sprintf("		Resource: %s\n", p.OutputRecordData(packetResource))
 	return res, nil
 }
 func (p *packet) OutputRecordData(packetResource packetResource) string {
@@ -358,14 +381,23 @@ func (p *packet) OutputRecordData(packetResource packetResource) string {
 	case CNAME:
 		res += packetResource.RData.CNAME_Name
 	case A:
-		res += string(packetResource.RData.A_IP[0:3])
+		res += bytesToDotSeparatedString(packetResource.RData.A_IP[0:3])
+		//res += string(packetResource.RData.A_IP[0:3])
 	case AAAA:
-		res += string(packetResource.RData.AAAA_IP[0:15])
+		res += bytesToDotSeparatedString(packetResource.RData.AAAA_IP[0:15])
+		//res += string(packetResource.RData.AAAA_IP[0:15])
 	case MX:
 		res += fmt.Sprintf("%d", packetResource.RData.MX.MX_Preference)
 		res += packetResource.RData.MX.MX_Name
 	default:
-		res += ""
+		res += string(packetResource.RData.Others)
 	}
 	return res
+}
+func bytesToDotSeparatedString(data []byte) string {
+	var parts []string
+	for _, b := range data {
+		parts = append(parts, fmt.Sprintf("%d", b))
+	}
+	return strings.Join(parts, ".")
 }

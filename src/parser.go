@@ -6,39 +6,41 @@ import (
 
 // 把二进制报文转换成packet
 type ParsePacket struct {
-	binaryPacket []byte //???????????????????????????
-	parsedPacket packet
+	BinaryPacket []byte
+	ParsedPacket packet
 }
 
 func (p *ParsePacket) ParsePacket() (ParsePacket, error) {
+	fmt.Println("START================================================")
 	var res packet
 	var err1 error
 	// header
-	res.header, err1 = p.ParseHeader(p.binaryPacket[0:12])
+	res.header, err1 = p.ParseHeader(p.BinaryPacket[0:12])
 	if err1 != nil {
 		return ParsePacket{}, err1
 	}
-	// queries
-	// 通常QC是1，如果QC不是1如何处理？？？？？？？？？？？？？？？
-	// for i := 1; i < int(res.header.QC); i++ {
-	// 	ParseQuery()
-	// }
 	start := 12
 	var currentIndex int
 	query, currentIndex, err2 := p.ParseQuery(start)
+	fmt.Println("TTTTTTTTTT:cur = ", currentIndex)
 	if err2 != nil {
 		return ParsePacket{}, err2
 	}
 	res.queries = append(res.queries, query)
 	// record
-	res.answers, currentIndex = p.ParseResourceRecords(int(res.header.AC), currentIndex)
-	res.authority, currentIndex = p.ParseResourceRecords(int(res.header.NSC), currentIndex)
-	res.additional, currentIndex = p.ParseResourceRecords(int(res.header.AR), currentIndex)
-	if currentIndex != len(p.binaryPacket)-1 {
-		err3 := fmt.Errorf(ERROR_RECORD_LENGTH)
+	var err3 error
+	fmt.Println("PARSEPACKET: index1", currentIndex, " AC: ", int(res.header.AC))
+	res.answers, currentIndex, err3 = p.ParseResourceRecords(int(res.header.AC), currentIndex)
+	fmt.Println("PASREPACKET: index2", currentIndex)
+	if err3 != nil {
+		fmt.Println("PARSEPACKET: err3 ,", err3)
 		return ParsePacket{}, err3
 	}
-	p.parsedPacket = res
+	// fmt.Println("PASEPACKET: parser res.answer:", res.answers, " res.answer[0].", res.answers[0].RData.A_IP[0], " ", res.answers[0].RData.A_IP[1], " ", res.answers[0].RData.A_IP[2], " ", res.answers[0].RData.A_IP[3])
+	res.authority, currentIndex, _ = p.ParseResourceRecords(int(res.header.NSC), currentIndex)
+	res.additional, _, _ = p.ParseResourceRecords(int(res.header.AR), currentIndex)
+	fmt.Println("PASEPACKET: parser res.additional:", res.additional, " res.additional[0].", res.additional[0])
+	p.ParsedPacket = res
 	return *p, nil
 }
 
@@ -59,7 +61,8 @@ func (p *ParsePacket) ParseHeader(data []byte) (packetHeader, error) {
 		err := fmt.Errorf("error: At least one error occurred when parse header")
 		return packetHeader{}, err
 	} else {
-		fmt.Println(header)
+		// fmt.Println("PARSEHEADER:header-----------------")
+		fmt.Println("PARSEHEADER", header)
 		return header, nil
 	}
 }
@@ -91,20 +94,27 @@ func (p *ParsePacket) ParseQuery(start int) (packetQuery, int, error) {
 	var query packetQuery
 	var err1 error
 	var currentIndex int
+	if currentIndex > len(p.BinaryPacket) {
+		fmt.Println("ParseQuery expired")
+		err3 := fmt.Errorf("parseQuery expired")
+		return packetQuery{}, 0, err3
+	}
 	query.QName, currentIndex, err1 = p.ParseDomainName(start)
 	if err1 != nil {
 		return packetQuery{}, -1, err1
 	}
-	qTypeUint16, err1 := Byte2ToUint16(p.binaryPacket[currentIndex : currentIndex+2])
+	qTypeUint16, err1 := Byte2ToUint16(p.BinaryPacket[currentIndex : currentIndex+2])
 	if err1 != nil {
 		return packetQuery{}, -1, err1
 	}
 	query.QType = QueryType(qTypeUint16)
-	qClassUint16, err2 := Byte2ToUint16(p.binaryPacket[currentIndex+2 : currentIndex+4])
+	qClassUint16, err2 := Byte2ToUint16(p.BinaryPacket[currentIndex+2 : currentIndex+4])
 	if err2 != nil {
 		return packetQuery{}, -1, err2
 	}
 	query.QClass = QueryClassType(qClassUint16)
+	currentIndex += 4
+	fmt.Println("QUETY: cur ", currentIndex)
 	return query, currentIndex, nil
 }
 
@@ -113,28 +123,20 @@ func (p *ParsePacket) ParseDomainName(offset int) (string, int, error) {
 	currentIndex := offset
 
 	for {
-		labelLength := int(p.binaryPacket[currentIndex])
+		labelLength := int(p.BinaryPacket[currentIndex])
 		if labelLength == 0 {
 			// 遇到长度为0的标签，表示域名结束
 			currentIndex++
 			break
 		}
 
-		//DNS报文中的域名可以使用指针来压缩，以减小报文的大小，用于减少 DNS 报文的冗余。
-		// if (labelLength & 0xC0) == 0xC0 {
-		//     // 如果标签长度的两个最高位是1，表示这是一个指针
-		//     // 解析指针并跳转到指定位置
-		//     pointerOffset := int(binary.BigEndian.Uint16([]byte{p.binaryPacket[currentIndex], p.binaryPacket[currentIndex+1] & 0x3F}))
-		//     currentIndex = pointerOffset
-		// } else {
-		// 非压缩标签，读取标签内容
 		currentIndex++
-		labelBytes := p.binaryPacket[currentIndex : currentIndex+labelLength]
+		labelBytes := p.BinaryPacket[currentIndex : currentIndex+labelLength]
 		qname += string(labelBytes) + "."
 		currentIndex += labelLength
 		//}
 
-		if currentIndex >= len(p.binaryPacket) {
+		if currentIndex >= len(p.BinaryPacket) {
 			return "", currentIndex, fmt.Errorf(ERROR_QNAME_END_MISSING)
 		}
 	}
@@ -146,23 +148,8 @@ func (p *ParsePacket) ParseDomainName(offset int) (string, int, error) {
 	return qname, currentIndex, nil
 }
 
-//record-------------------------------------------------
-//todo:delete after finishing coding
-/*A记录（IPv4地址记录）：RData 包含一个4字节的IPv4地址，通常表示为 []byte 或 net.IP 类型。
-
-AAAA记录（IPv6地址记录）：RData 包含一个16字节的IPv6地址，通常表示为 []byte 或 net.IP 类型。
-
-CNAME记录（规范名称记录）：RData 包含一个规范名称，通常是一个域名字符串。
-
-MX记录（邮件交换记录）：RData 包含邮件服务器的域名和优先级，通常表示为一个结构体或自定义类型。
-
-TXT记录（文本记录）：RData 包含文本数据，通常是一个字符串。
-
-NS记录（域名服务器记录）：RData 包含域名服务器的域名，通常表示为一个域名字符串。
-
-SRV记录（服务记录）：RData 包含服务的相关信息，通常表示为一个结构体或自定义类型。
-*/
-func (p *ParsePacket) ParseResourceRecords(count int, currentIndex int) ([]packetResource, int) {
+func (p *ParsePacket) ParseResourceRecords(count int, currentIndex int) ([]packetResource, int, error) {
+	fmt.Println("RECORDS START```````````````````````````")
 	i := 0
 	var res []packetResource
 	for i < count {
@@ -170,62 +157,76 @@ func (p *ParsePacket) ParseResourceRecords(count int, currentIndex int) ([]packe
 		var packetResource packetResource
 		packetResource, currentIndex, err = p.ParseResourceRecord(currentIndex)
 		if err != nil {
-			return nil, -1
+			fmt.Println("PARSE_RESOURCE_RECORDS: ", err, " currentIndex", currentIndex)
+			return nil, currentIndex, err
 		}
 		res = append(res, packetResource)
+		i += 1
 	}
-	return res, currentIndex
+	return res, currentIndex, nil
 }
 func (p *ParsePacket) ParseResourceRecord(offset int) (packetResource, int, error) {
+	fmt.Println("RECORD START·············")
 	var rr packetResource
 	currentIndex := offset
 
 	// 解析域名字段
 	domainName, newOffset, err := p.ParseDomainName(currentIndex)
 	if err != nil {
+		fmt.Println("PARSE_DOMAIN_NAME: error ", err)
 		return rr, currentIndex, err
 	}
 	rr.Name = domainName
 	currentIndex = newOffset
-
+	fmt.Println("RECORD_PARSE_DOMAIN_NAME 1: ", rr.Name)
 	// 解析资源记录的类型、类、TTL和数据长度字段
-	if currentIndex+10 > len(p.binaryPacket) {
-		err1 := fmt.Errorf("resource record parsing error: unexpected end of data")
-		return rr, currentIndex, err1
+	if currentIndex+10 > len(p.BinaryPacket) {
+		err0 := fmt.Errorf("this is a resource record parsing error: unexpected end of data")
+		fmt.Println("PARSE_RECORD: error ", err0, "\n		lenth of binary packet: ", len(p.BinaryPacket))
+		return rr, currentIndex, err0
 	}
-
-	Type, err1 := Byte2ToUint16(p.binaryPacket[currentIndex : currentIndex+2])
+	fmt.Println("TTTTTTTTTTTTTTTT:cur = ", currentIndex)
+	Type, err1 := Byte2ToUint16(p.BinaryPacket[currentIndex : currentIndex+2])
 	if err1 != nil {
+		fmt.Println("PARSE_RECORD: err1 ", err1)
 		return packetResource{}, -1, err1
 	}
 	rr.Type = QueryType(Type)
+	fmt.Println("RECORD rr.Type: ", rr.Type)
 
-	Class, err2 := Byte2ToUint16(p.binaryPacket[currentIndex+2 : currentIndex+4])
+	Class, err2 := Byte2ToUint16(p.BinaryPacket[currentIndex+2 : currentIndex+4])
 	if err2 != nil {
-		return packetResource{}, -1, err2
+		fmt.Println("PARSE_RECORD: err2 ", err2)
+		return packetResource{}, -2, err2
 	}
 	rr.Class = QueryClassType(Class)
-	TTL, err3 := Byte4ToUint32(p.binaryPacket[currentIndex+4 : currentIndex+8])
+	TTL, err3 := Byte4ToUint32(p.BinaryPacket[currentIndex+4 : currentIndex+8])
 	rr.TTL = TTL
 	if err3 != nil {
-		return packetResource{}, -1, err3
+		fmt.Println("PARSE_RECORD: err3 ", err3)
+		return packetResource{}, -3, err3
 	}
 
-	DataLen, err4 := Byte2ToUint16(p.binaryPacket[currentIndex+8 : currentIndex+10])
+	DataLen, err4 := Byte2ToUint16(p.BinaryPacket[currentIndex+8 : currentIndex+10])
 	if err4 != nil {
-		return packetResource{}, -1, err4
+		fmt.Println("PARSE_RECORD: err4 ", err4)
+		return packetResource{}, -4, err4
 	}
 	rr.ReLength = DataLen
 	currentIndex += 10
 
 	// 解析资源记录的数据字段
-	if currentIndex+int(rr.ReLength) > len(p.binaryPacket) {
-		return rr, currentIndex, fmt.Errorf("resource record parsing error: unexpected end of data")
+	if currentIndex+int(rr.ReLength) > len(p.BinaryPacket) {
+		err6 := fmt.Errorf("resource record parsing error: unexpected end of data")
+		fmt.Println("PARSE_RECORD: ERROR ", err6, " CURRENTINDEX+INT(RR.RELENTH) = ", currentIndex+int(rr.ReLength), " CURRENTINDEX = ", currentIndex, " INT = ", int(rr.ReLength), " rr.RELENGT = ", rr.ReLength, " LEN(P.BINARYPACKET) = ", len(p.BinaryPacket))
+		return rr, currentIndex, err6
 	}
+	fmt.Println("RDATA: cur ", currentIndex)
 	RData, err5 := p.ParseRecourdData(rr, currentIndex)
 	currentIndex += int(rr.ReLength)
 	if err5 != nil {
-		return packetResource{}, -1, err5
+		fmt.Println("PARSE_RECORD: err5 ", err5)
+		return packetResource{}, -5, err5
 	}
 	rr.RData = RData
 	return rr, currentIndex, nil
@@ -237,10 +238,10 @@ func (p *ParsePacket) ParseRecourdData(r packetResource, RDstartIndex int) (pack
 	switch r.Type {
 	case A:
 		RecordData.A_IP = [4]byte{
-			p.binaryPacket[RDstartIndex],
-			p.binaryPacket[RDstartIndex+1],
-			p.binaryPacket[RDstartIndex+2],
-			p.binaryPacket[RDstartIndex+3],
+			p.BinaryPacket[RDstartIndex],
+			p.BinaryPacket[RDstartIndex+1],
+			p.BinaryPacket[RDstartIndex+2],
+			p.BinaryPacket[RDstartIndex+3],
 		}
 	case NS:
 		var err error
@@ -257,26 +258,26 @@ func (p *ParsePacket) ParseRecourdData(r packetResource, RDstartIndex int) (pack
 	case AAAA:
 		// 解析AAAA记录的RData（IPv6地址）
 		RecordData.AAAA_IP = [16]byte{
-			p.binaryPacket[RDstartIndex],
-			p.binaryPacket[RDstartIndex+1],
-			p.binaryPacket[RDstartIndex+2],
-			p.binaryPacket[RDstartIndex+3],
-			p.binaryPacket[RDstartIndex+4],
-			p.binaryPacket[RDstartIndex+5],
-			p.binaryPacket[RDstartIndex+6],
-			p.binaryPacket[RDstartIndex+7],
-			p.binaryPacket[RDstartIndex+8],
-			p.binaryPacket[RDstartIndex+9],
-			p.binaryPacket[RDstartIndex+10],
-			p.binaryPacket[RDstartIndex+11],
-			p.binaryPacket[RDstartIndex+12],
-			p.binaryPacket[RDstartIndex+13],
-			p.binaryPacket[RDstartIndex+14],
-			p.binaryPacket[RDstartIndex+15],
+			p.BinaryPacket[RDstartIndex],
+			p.BinaryPacket[RDstartIndex+1],
+			p.BinaryPacket[RDstartIndex+2],
+			p.BinaryPacket[RDstartIndex+3],
+			p.BinaryPacket[RDstartIndex+4],
+			p.BinaryPacket[RDstartIndex+5],
+			p.BinaryPacket[RDstartIndex+6],
+			p.BinaryPacket[RDstartIndex+7],
+			p.BinaryPacket[RDstartIndex+8],
+			p.BinaryPacket[RDstartIndex+9],
+			p.BinaryPacket[RDstartIndex+10],
+			p.BinaryPacket[RDstartIndex+11],
+			p.BinaryPacket[RDstartIndex+12],
+			p.BinaryPacket[RDstartIndex+13],
+			p.BinaryPacket[RDstartIndex+14],
+			p.BinaryPacket[RDstartIndex+15],
 		}
 	case MX:
 
-		preference := uint16(p.binaryPacket[RDstartIndex])<<8 | uint16(p.binaryPacket[RDstartIndex+1])
+		preference := uint16(p.BinaryPacket[RDstartIndex])<<8 | uint16(p.BinaryPacket[RDstartIndex+1])
 		RecordData.MX.MX_Preference = preference
 
 		// MX记录中的RData包括一个域名
@@ -286,7 +287,6 @@ func (p *ParsePacket) ParseRecourdData(r packetResource, RDstartIndex int) (pack
 		}
 		RecordData.MX.MX_Name = name
 	default:
-		return RecordData, fmt.Errorf("parseRecordData unsupported record type: %d", r.Type)
 	}
 	return RecordData, nil
 }
